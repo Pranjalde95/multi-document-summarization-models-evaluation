@@ -1,0 +1,51 @@
+# Core ML and NLP libraries
+torch>=1.9.0
+transformers>=4.21.0
+datasets>=2.5.0
+evaluate>=0.4.0
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Evaluation metrics
+rouge-score>=0.1.2
+bert-score>=0.3.11
+
+# Knowledge-aware summarization dependencies
+sentence-transformers>=2.2.0
+yake>=0.4.8
+
+# Hierarchical transformer dependencies
+nltk>=3.7
+
+# Graph-based model dependencies
+scikit-learn>=1.1.0
+networkx>=2.8
+
+# Training utilities
+accelerate>=0.12.0
+tensorboard>=2.9.0
+
+# Optional but recommended
+jupyter>=1.0.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+tqdm>=4.64.0
+
+# GPU acceleration (choose one based on your setup)
+GPU used ASUS ROG RTX 5050 (16gb/1TB/ intel core i7)
+Along with collab cloud A100
+
+bash
+pip install -r requirements.txt
+Additional setup for specific components:
+
+For NLTK (hierarchical transformer):
+
+python
+import nltk
+nltk.download('punkt')
+For sentence-transformers (first run downloads models automatically):
+
+python
+from sentence_transformers import SentenceTransformer
+model = SentenceTransformer('all-MiniLM-L6-v2')  # Downloads on first use
