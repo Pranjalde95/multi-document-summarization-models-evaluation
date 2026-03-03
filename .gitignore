@@ -1,0 +1,22 @@
+# Ignore output folders
+outputs/
+*_outputs/
+**/outputs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Model checkpoints
+*.pt
+*.bin
+*.ckpt
+*.safetensors
+
+# HuggingFace cache
+.cache/
+wandb/
+runs/
+
+# System files
+.DS_Store
