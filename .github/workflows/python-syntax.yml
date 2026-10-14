@@ -1,0 +1,27 @@
+name: Python syntax checks
+
+on:
+  pull_request:
+    paths:
+      - '**/*.py'
+      - '.github/workflows/python-syntax.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**/*.py'
+      - '.github/workflows/python-syntax.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-python:
+    name: Parse and compile Python files (no training)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check syntax without downloading models or datasets
+        run: python -m compileall -q "scripts_1_benchmark _models" scripts_2_advanced_models
