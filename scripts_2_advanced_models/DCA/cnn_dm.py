@@ -1,5 +1,10 @@
-# Auto-generated: dca on cnn_dm
+# T5-base proxy in the DCA-labelled group; agent communication is not implemented.
+# Dataset: cnn_dm; training configuration and model selection unchanged.
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import train_eval
 
 if __name__ == "__main__":
