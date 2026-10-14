@@ -1,6 +1,6 @@
 # Core ML and NLP libraries
 torch>=1.9.0
-transformers>=4.21.0
+transformers>=4.57.3,<5.0
 datasets>=2.5.0
 evaluate>=0.4.0
 numpy>=1.21.0
@@ -31,21 +31,5 @@ matplotlib>=3.5.0
 seaborn>=0.11.0
 tqdm>=4.64.0
 
-# GPU acceleration (choose one based on your setup)
-GPU used ASUS ROG RTX 5050 (16gb/1TB/ intel core i7)
-Along with collab cloud A100
-
-bash
-pip install -r requirements.txt
-Additional setup for specific components:
-
-For NLTK (hierarchical transformer):
-
-python
-import nltk
-nltk.download('punkt')
-For sentence-transformers (first run downloads models automatically):
-
-python
-from sentence_transformers import SentenceTransformer
-model = SentenceTransformer('all-MiniLM-L6-v2')  # Downloads on first use
+# Install with: pip install -r requirements.txt
+# For hardware requirements and experiment scope see the README files.

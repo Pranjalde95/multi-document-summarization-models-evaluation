@@ -9,14 +9,12 @@ from transformers import (
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
     DataCollatorForSeq2Seq,
-    Trainer,
-    TrainingArguments,
+    Seq2SeqTrainer,
+    Seq2SeqTrainingArguments,
 )
 
 # Optional dependencies
 try:
-    import nltk
-    nltk.download("punkt", quiet=True)
     from nltk.tokenize import sent_tokenize
 except Exception:
     sent_tokenize = None
@@ -36,10 +34,10 @@ DATASETS = {
 }
 
 SOURCE_CANDIDATES = [
-    "article", "document", "documents", "text", "body", "story", "content", "input", "src", "source"
+    "source", "sources", "article", "document", "documents", "text", "body", "story", "content", "input", "src"
 ]
 TARGET_CANDIDATES = [
-    "highlights", "summary", "summaries", "target", "title", "titles", "output", "tgt"
+    "highlights", "summary", "summaries", "target", "headline", "abstract", "title", "titles", "output", "tgt"
 ]
 
 def _coerce_to_str(x):
@@ -56,25 +54,15 @@ def _coerce_to_str(x):
     return str(x)
 
 def pick_columns(example):
-    cols = set(example.keys())
-    src_col = None
-    tgt_col = None
-    for c in SOURCE_CANDIDATES:
-        if c in cols:
-            src_col = c
-            break
-    for c in TARGET_CANDIDATES:
-        if c in cols:
-            tgt_col = c
-            break
-    if src_col is None and "text" in cols and "summary" in cols:
-        src_col = "text"
-        tgt_col = "summary"
-    if src_col is None:
-        src_col = list(cols)[0]
-    if tgt_col is None:
-        rest = [c for c in cols if c != src_col]
-        tgt_col = rest[0] if rest else src_col
+    """Choose recognised document and summary columns, or fail explicitly."""
+    columns = set(example.keys())
+    src_col = next((c for c in SOURCE_CANDIDATES if c in columns), None)
+    tgt_col = next((c for c in TARGET_CANDIDATES if c in columns and c != src_col), None)
+    if src_col is None or tgt_col is None:
+        raise ValueError(
+            f"Unrecognised source/target columns: {sorted(columns)}. "
+            "Add an explicit mapping instead of treating arbitrary metadata as text."
+        )
     return src_col, tgt_col
 
 def load_split(ds_name: str):
@@ -85,18 +73,24 @@ def load_split(ds_name: str):
         ds = load_dataset(hf_id, config)
     if "train" in ds and "validation" in ds and "test" in ds:
         return ds["train"], ds["validation"], ds["test"]
-    elif "train" in ds and "validation" in ds:
-        return ds["train"], ds["validation"], ds["validation"]
     elif "train" in ds and "test" in ds:
-        return ds["train"], ds["test"], ds["test"]
+        # Keep the provided test set held out from checkpoint selection.
+        parts = ds["train"].train_test_split(test_size=0.01, seed=42)
+        return parts["train"], parts["test"], ds["test"]
+    elif "train" in ds and len(ds) == 1:
+        # For train-only datasets, make independent, reproducible splits.
+        parts = ds["train"].train_test_split(test_size=0.02, seed=42)
+        held_out = parts["test"].train_test_split(test_size=0.5, seed=42)
+        return parts["train"], held_out["train"], held_out["test"]
     else:
-        only = list(ds.keys())[0]
-        return ds[only], ds[only], ds[only]
+        raise ValueError(
+            f"Dataset {ds_name} needs independent train/validation/test splits; got {list(ds.keys())}"
+        )
 
 def append_knowledge(texts: List[str], num_keywords: int = 10) -> List[str]:
     out = []
     if yake is None:
-        return texts
+        raise ImportError("Keyword-aware preprocessing requires 'yake' (pip install yake).")
     kw_extractor = yake.KeywordExtractor(top=num_keywords)
     for t in texts:
         try:
@@ -110,8 +104,14 @@ def append_knowledge(texts: List[str], num_keywords: int = 10) -> List[str]:
 
 def hierarchical_preprocess(text: str, max_sentences: int = 30) -> str:
     if sent_tokenize is None:
-        return text
-    sents = sent_tokenize(text)
+        raise ImportError("Hierarchical sentence preprocessing requires nltk.")
+    try:
+        sents = sent_tokenize(text)
+    except LookupError as exc:
+        raise RuntimeError(
+            "NLTK sentence tokenizer data is missing. "
+            "Install it with: python -m nltk.downloader punkt punkt_tab"
+        ) from exc
     return " ".join(sents[:max_sentences])
 
 def build_preprocess_fn(tokenizer, max_input_length=1024, max_target_length=128, knowledge=False, hierarchical=False):
@@ -131,33 +131,41 @@ def build_preprocess_fn(tokenizer, max_input_length=1024, max_target_length=128,
         return model_inputs
     return preprocess
 
-def compute_metrics_builder(tokenizer_name: str = "roberta-large"):
+def compute_metrics_builder(tokenizer):
+    """Score generated token IDs; mask ignored target tokens before decoding."""
     rouge = evaluate.load("rouge")
     try:
         bertscore = evaluate.load("bertscore")
     except Exception:
         bertscore = None
-    from transformers import AutoTokenizer
-    tok = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=True)
+
     def compute_metrics(eval_pred):
         preds, labels = eval_pred
-        decoded_preds = tok.batch_decode(preds, skip_special_tokens=True)
-        decoded_labels = tok.batch_decode(labels, skip_special_tokens=True)
-        results = rouge.compute(predictions=decoded_preds, references=decoded_labels, use_stemmer=True)
+        if isinstance(preds, tuple):
+            preds = preds[0]
+        pad_id = tokenizer.pad_token_id
+        decoded_preds = tokenizer.batch_decode(np.where(preds != -100, preds, pad_id), skip_special_tokens=True)
+        decoded_labels = tokenizer.batch_decode(np.where(labels != -100, labels, pad_id), skip_special_tokens=True)
+        results = rouge.compute(
+            predictions=decoded_preds, references=decoded_labels, use_stemmer=True
+        )
         out = {
-            "rouge1": float(results.get("rouge1", 0.0)),
-            "rouge2": float(results.get("rouge2", 0.0)),
-            "rougeL": float(results.get("rougeL", 0.0)),
+            "rouge1": float(results["rouge1"]),
+            "rouge2": float(results["rouge2"]),
+            "rougeL": float(results["rougeL"]),
         }
+        # BERTScore is expensive and may fail on restricted hardware.
+        out["bertscore_f1"] = None
         if bertscore is not None:
             try:
-                b = bertscore.compute(predictions=decoded_preds, references=decoded_labels, lang="en", model_type="microsoft/deberta-xlarge-mnli")
+                b = bertscore.compute(
+                    predictions=decoded_preds, references=decoded_labels, lang="en"
+                )
                 out["bertscore_f1"] = float(np.mean(b["f1"]))
             except Exception:
-                out["bertscore_f1"] = float("nan")
-        else:
-            out["bertscore_f1"] = float("nan")
+                pass
         return out
+
     return compute_metrics
 
 def train_eval(
@@ -194,13 +202,13 @@ def train_eval(
 
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
-    args = TrainingArguments(
+    args = Seq2SeqTrainingArguments(
         output_dir=output_dir,
         num_train_epochs=num_train_epochs,
         per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=gradient_accumulation_steps,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=logging_steps,
         save_steps=logging_steps,
         save_total_limit=1,
@@ -210,18 +218,18 @@ def train_eval(
         bf16=bf16,
         logging_steps=logging_steps,
         predict_with_generate=True,
-        generation_max_new_tokens=gen_max_new_tokens,
+        generation_max_length=gen_max_new_tokens,
         report_to=[],
     )
 
-    trainer = Trainer(
+    trainer = Seq2SeqTrainer(
         model=model,
         args=args,
         train_dataset=train_proc,
         eval_dataset=val_proc,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=data_collator,
-        compute_metrics=compute_metrics_builder(tokenizer_name=model_name),
+        compute_metrics=compute_metrics_builder(tokenizer),
     )
 
     trainer.train()
@@ -230,7 +238,7 @@ def train_eval(
         "rouge1": float(metrics.get("eval_rouge1", 0.0)),
         "rouge2": float(metrics.get("eval_rouge2", 0.0)),
         "rougeL": float(metrics.get("eval_rougeL", 0.0)),
-        "bertscore_f1": float(metrics.get("eval_bertscore_f1", float("nan"))),
+        "bertscore_f1": metrics.get("eval_bertscore_f1"),
     }
     os.makedirs(output_dir, exist_ok=True)
     with open(os.path.join(output_dir, "scores.json"), "w", encoding="utf-8") as f:
