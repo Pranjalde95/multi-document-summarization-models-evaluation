@@ -56,7 +56,7 @@ def compute_metrics(pred):
     return {'rouge1': s['rouge1'], 'rouge2': s['rouge2'], 'rougeL': s['rougeL']}
 
 args = Seq2SeqTrainingArguments(
-    output_dir=OUT_DIR, evaluation_strategy="steps",
+    output_dir=OUT_DIR, eval_strategy="steps",
     per_device_train_batch_size=TRAIN_BS, per_device_eval_batch_size=EVAL_BS,
     gradient_accumulation_steps=GRAD_ACCUM, num_train_epochs=EPOCHS,
     learning_rate=LR, predict_with_generate=True,
@@ -69,7 +69,7 @@ args = Seq2SeqTrainingArguments(
 trainer = Seq2SeqTrainer(
     model=model, args=args,
     train_dataset=train_ds, eval_dataset=val_ds,
-    data_collator=collator, tokenizer=tok, compute_metrics=compute_metrics
+    data_collator=collator, processing_class=tok, compute_metrics=compute_metrics
 )
 
 trainer.train()
