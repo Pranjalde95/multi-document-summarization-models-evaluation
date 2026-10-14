@@ -15,8 +15,6 @@ from transformers import (
 
 # Optional dependencies
 try:
-    import nltk
-    nltk.download("punkt", quiet=True)
     from nltk.tokenize import sent_tokenize
 except Exception:
     sent_tokenize = None
@@ -36,10 +34,10 @@ DATASETS = {
 }
 
 SOURCE_CANDIDATES = [
-    "article", "document", "documents", "text", "body", "story", "content", "input", "src", "source"
+    "source", "sources", "article", "document", "documents", "text", "body", "story", "content", "input", "src"
 ]
 TARGET_CANDIDATES = [
-    "highlights", "summary", "summaries", "target", "title", "titles", "output", "tgt"
+    "highlights", "summary", "summaries", "target", "headline", "abstract", "title", "titles", "output", "tgt"
 ]
 
 def _coerce_to_str(x):
@@ -56,25 +54,15 @@ def _coerce_to_str(x):
     return str(x)
 
 def pick_columns(example):
-    cols = set(example.keys())
-    src_col = None
-    tgt_col = None
-    for c in SOURCE_CANDIDATES:
-        if c in cols:
-            src_col = c
-            break
-    for c in TARGET_CANDIDATES:
-        if c in cols:
-            tgt_col = c
-            break
-    if src_col is None and "text" in cols and "summary" in cols:
-        src_col = "text"
-        tgt_col = "summary"
-    if src_col is None:
-        src_col = list(cols)[0]
-    if tgt_col is None:
-        rest = [c for c in cols if c != src_col]
-        tgt_col = rest[0] if rest else src_col
+    """Choose recognised document and summary columns, or fail explicitly."""
+    columns = set(example.keys())
+    src_col = next((c for c in SOURCE_CANDIDATES if c in columns), None)
+    tgt_col = next((c for c in TARGET_CANDIDATES if c in columns and c != src_col), None)
+    if src_col is None or tgt_col is None:
+        raise ValueError(
+            f"Unrecognised source/target columns: {sorted(columns)}. "
+            "Add an explicit mapping instead of treating arbitrary metadata as text."
+        )
     return src_col, tgt_col
 
 def load_split(ds_name: str):
@@ -102,7 +90,7 @@ def load_split(ds_name: str):
 def append_knowledge(texts: List[str], num_keywords: int = 10) -> List[str]:
     out = []
     if yake is None:
-        return texts
+        raise ImportError("Keyword-aware preprocessing requires 'yake' (pip install yake).")
     kw_extractor = yake.KeywordExtractor(top=num_keywords)
     for t in texts:
         try:
@@ -116,8 +104,14 @@ def append_knowledge(texts: List[str], num_keywords: int = 10) -> List[str]:
 
 def hierarchical_preprocess(text: str, max_sentences: int = 30) -> str:
     if sent_tokenize is None:
-        return text
-    sents = sent_tokenize(text)
+        raise ImportError("Hierarchical sentence preprocessing requires nltk.")
+    try:
+        sents = sent_tokenize(text)
+    except LookupError as exc:
+        raise RuntimeError(
+            "NLTK sentence tokenizer data is missing. "
+            "Install it with: python -m nltk.downloader punkt punkt_tab"
+        ) from exc
     return " ".join(sents[:max_sentences])
 
 def build_preprocess_fn(tokenizer, max_input_length=1024, max_target_length=128, knowledge=False, hierarchical=False):

@@ -34,11 +34,17 @@ From the repository root:
 
 ```bash
 pip install -r requirements.txt
-PYTHONPATH=scripts_2_advanced_models python scripts_2_advanced_models/Absformer/cnn_dm.py
-PYTHONPATH=scripts_2_advanced_models python "scripts_2_advanced_models/External Knowledge (keyword_aware)/wikisum.py"
+python scripts_2_advanced_models/Absformer/cnn_dm.py
+python "scripts_2_advanced_models/External Knowledge (keyword_aware)/wikisum.py"
 ```
 
-The `PYTHONPATH` setting lets scripts import the shared `common.py`. The commands illustrate how scripts are structured, not proof that they have been run successfully on the current dependency versions.
+The launcher scripts add their parent directory to Python's import path to locate the shared `common.py`, so a separate `PYTHONPATH` setting is unnecessary. Output paths are located relative to the repository root. These commands are examples, not evidence of verified execution or model training.
+
+## Dataset preparation and optional features
+
+The shared helper recognises explicit source and target fields, including `sources`/`target` (WikiSum) and `text`/`headline` (WikiHow). It now raises a clear error for an unsupported schema instead of selecting arbitrary columns. Multi-document `sources` are concatenated as text before tokenisation; they are **not** handled by a separate graph or document-fusion architecture.
+
+For keyword-aware preprocessing, `yake` must be installed. For the sentence-truncation preprocessing, install `nltk` and its sentence tokenizer resources if required (e.g. `python -m nltk.downloader punkt punkt_tab`). Missing optional dependencies are reported rather than silently disabling an advertised preprocessing method.
 
 ## GPU considerations
 
