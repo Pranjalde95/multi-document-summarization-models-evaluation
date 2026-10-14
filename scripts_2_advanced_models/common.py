@@ -208,7 +208,7 @@ def train_eval(
         per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=gradient_accumulation_steps,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=logging_steps,
         save_steps=logging_steps,
         save_total_limit=1,
@@ -227,7 +227,7 @@ def train_eval(
         args=args,
         train_dataset=train_proc,
         eval_dataset=val_proc,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics_builder(tokenizer),
     )
