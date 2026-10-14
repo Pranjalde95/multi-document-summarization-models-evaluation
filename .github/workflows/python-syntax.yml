@@ -1,27 +1,36 @@
-name: Python syntax checks
+name: Python syntax and import checks
 
 on:
   pull_request:
     paths:
       - '**/*.py'
+      - 'requirements.txt'
       - '.github/workflows/python-syntax.yml'
   push:
-    branches: [main]
+    branches:
+      - main
+      - cleanup-readmes-and-summarization-scripts-2026
     paths:
       - '**/*.py'
+      - 'requirements.txt'
       - '.github/workflows/python-syntax.yml'
 
 permissions:
   contents: read
 
 jobs:
-  compile-python:
-    name: Parse and compile Python files (no training)
+  validate-python:
+    name: Compile files and check imports (no training)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Check syntax without downloading models or datasets
-        run: python -m compileall -q "scripts_1_benchmark _models" scripts_2_advanced_models
+      - name: Check Python syntax
+        run: python -m compileall -q "scripts_1_benchmark _models" scripts_2_advanced_models tools/check_imports.py
+      - name: Install project dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Check imports without model training or dataset downloads
+        run: python tools/check_imports.py
