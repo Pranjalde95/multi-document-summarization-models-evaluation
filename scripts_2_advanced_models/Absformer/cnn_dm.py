@@ -1,5 +1,10 @@
-# Auto-generated: absformer on cnn_dm
+# PEGASUS baseline used as an AbsFormer-inspired proxy; not the AbsFormer architecture.
+# Dataset: cnn_dm; training configuration and model selection unchanged.
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import train_eval
 
 if __name__ == "__main__":
