@@ -1,50 +1,55 @@
-# Summarization Benchmarks (5 Models × 5 Datasets)
+# Benchmark Summarization Pipelines (5 Models × 5 Datasets)
 
-This repo contains **25 standalone scripts** — one per **model–dataset** pair — to fine-tune and evaluate sequence-to-sequence summarization models on common datasets. Each script:
+This directory provides **25 scripts**—one for each of five pretrained sequence-to-sequence model backbones and five datasets. The scripts define fine-tuning and evaluation procedures; they do **not** by themselves document completed full-dataset experiments.
 
-- Trains on the **entire training split**
-- Evaluates on the **entire test split**
-- Logs ROUGE during eval steps
-- Saves final **ROUGE-1/2/L** and **BERTScore F1** to `scores.json`
+## Pretrained model backbones
 
-## Models
-- **BART** (`facebook/bart-large-cnn`)
-- **PEGASUS** (`google/pegasus-large`)
-- **T5** (`t5-large`, with `summarize:` prefix)
-- **PRIMERA** (`allenai/PRIMERA` — LED-based long-context)
-- **BigBird-PEGASUS** (`google/bigbird-pegasus-large-arxiv` — long-context)
+- BART (`facebook/bart-large-cnn`)
+- PEGASUS (`google/pegasus-large`)
+- T5 (`t5-large`)
+- PRIMERA (`allenai/PRIMERA`)
+- BigBird-PEGASUS (`google/bigbird-pegasus-large-arxiv`)
 
-## Datasets
-- **CNN/DailyMail** (`abisee/cnn_dailymail` — SDS)
-- **WikiHow** (`sentence-transformers/wikihow` — SDS, headline)
-- **XSum** (`EdinburghNLP/xsum` — SDS, one-sentence summaries)
-- **WikiSum** (`d0rj/wikisum` — MDS; we split 98/1/1 from the provided `train` and concat top-k sources)
-- **Newsroom** (`lil-lab/newsroom` — Mixed; default SDS; optional MDS-style variant not included here for simplicity)
+## Datasets and task type
 
-> **Hardware:** defaults are tuned for **Colab A100** (bf16).Preferably with high GPU for smoother run.
+- CNN/DailyMail — single-document summarization
+- WikiHow — single-document summarization
+- XSum — single-document summarization
+- WikiSum — multi-document-oriented source handling
+- Newsroom — predominantly single-document summarization in this repository
 
-```
-## installation
+Dataset loading and split handling may require adjustment if upstream datasets change.
+
+## Intended pipeline
+
+1. Load and preprocess the dataset.
+2. Tokenize source text and reference summaries.
+3. Load a pretrained model and configure fine-tuning.
+4. Generate summaries for evaluation.
+5. Calculate ROUGE-1, ROUGE-2, ROUGE-L and BERTScore F1.
+6. Save results to `./outputs/<model>_<dataset>/scores.json` following a successful run.
+
+Scores and checkpoints are only valid evidence for an experiment if backed by that experiment's execution records.
+
+## Installation
+
+```bash
 pip install -r requirements.txt
-# Example: train/eval BART on CNN/DailyMail
-python scripts/bart/cnn_dm.py
-# Scores at: ./outputs/bart_cnn_dm/scores.json
 ```
 
-All scripts follow the same pattern. Change `EPOCHS` to 3–5 for better results; 1 epoch is for smoke tests.
+Example script path from the repository root (note the existing space in the folder name):
 
-## Outputs
-Each script writes to `./outputs/<model>_<dataset>/`:
-- `scores.json` – final ROUGE-1/2/L and BERTScore F1
-
+```bash
+python "scripts_1_benchmark _models/Bart/cnn_dm.py"
 ```
 
-## Pipeline
+## Hardware and configuration
 
-Load dataset and tokenize.
+The scripts contain BF16/gradient-accumulation settings intended for high-memory, BF16-compatible GPUs such as NVIDIA A100. These settings are *requirements or defaults*, not a report that training has been completed on an A100.
 
-Long-input handling for PRIMERA/BigBird-Pegasus.
+## Limitations
 
-Load pretrained model & tokenizer.
-
-Fine-tune on training data.
+- Long-context models and full-dataset training can be expensive.
+- Some older model and library interfaces may require updates.
+- No complete set of run logs/checkpoints is provided here to substantiate full training across all 25 configurations.
+- Code maintenance and syntax checks do not substitute for model training, evaluation or empirical verification.

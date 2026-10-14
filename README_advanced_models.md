@@ -1,100 +1,51 @@
-# Next 5 Model Summary
+# Exploratory Advanced Summarization Approaches
 
-This package contains **training & evaluation scripts** for 5 different summarization model types, each fine-tuned and evaluated on 5 datasets.  
-All scripts are designed to run on the **entire dataset**, not samples.
+This folder contains **25 model–dataset pipeline scripts** (five exploratory approaches × five datasets), plus shared preprocessing, training and evaluation code in [`common.py`](scripts_2_advanced_models/common.py). Each script configures a pretrained sequence-to-sequence model and calls the shared workflow.
 
----
+These are **proxies or simplified experimental adaptations**, not complete independent implementations of the named research architectures.
 
-## Models Implemented
+## What the code implements
 
-1. **AbsFormer (Unsupervised MDS)** – (implemented via a strong abstractive proxy: PEGASUS)  
-2. **Graph-based Neural Networks for MDS (TG-MultiSum)** – (proxy: BART; hook points to add graph encoder)  
-3. **Hierarchical Transformer** – sentence-level truncation proxy using PRIMERA tokenizer/model  
-4. **Deep Communicating Agents (DCA)** – (proxy: T5-base; hook points to add multi-agent fusion)  
-5. **Knowledge-Aware Summarisation** – YAKE keywords appended to inputs
+| Directory | Actual backbone | Implemented approach | Important distinction |
+| --- | --- | --- | --- |
+| `Absformer/` | `google/pegasus-large` | Standard PEGASUS summarization pipeline | Does **not** reproduce the full AbsFormer architecture or unsupervised method |
+| `GNN (tg_multisum)/` | `facebook/bart-large-cnn` | BART baseline | No graph construction, graph encoder or TG-MultiSum implementation in the shared pipeline |
+| `hierarchical_transformer/` | `allenai/PRIMERA` | Sentence-truncation preprocessing via `hierarchical=True` | Not a separate hierarchical transformer with learned hierarchical attention |
+| `DCA/` | `t5-base` | T5 baseline | No multi-agent communication or fusion mechanism implemented |
+| `External Knowledge (keyword_aware)/` | `google/pegasus-large` | YAKE-extracted keywords appended to input when available | Keyword augmentation, not an external knowledge graph or retrieval system |
 
----
+## Datasets
 
-## Folder Structure
+Scripts are provided for CNN/DailyMail, WikiHow, XSum, WikiSum and Newsroom. Several are single-document datasets. The folder name and model labels do not establish that all configurations perform genuine multi-document summarization.
 
-See subfolders with one scripts 2 per dataset plus a shared `common.py`.
+## Workflow represented in code
 
----
+1. Load a dataset using Hugging Face Datasets.
+2. Choose source and target text columns; tokenize inputs and target summaries.
+3. Optionally prepend keyword information or truncate sentence lists.
+4. Load a pretrained encoder–decoder model.
+5. Configure a fine-tuning/evaluation pipeline.
+6. Compute ROUGE-1/2/L and BERTScore F1 where generation and evaluation succeed.
+7. Write `scores.json` to the model's output directory after a successful run.
 
-## Installation
+## Installation and example invocation
+
+From the repository root:
 
 ```bash
-pip install transformers datasets evaluate sentence-transformers yake nltk
+pip install -r requirements.txt
+PYTHONPATH=scripts_2_advanced_models python scripts_2_advanced_models/Absformer/cnn_dm.py
+PYTHONPATH=scripts_2_advanced_models python "scripts_2_advanced_models/External Knowledge (keyword_aware)/wikisum.py"
 ```
 
----
+The `PYTHONPATH` setting lets scripts import the shared `common.py`. The commands illustrate how scripts are structured, not proof that they have been run successfully on the current dependency versions.
 
-## Running a Script
+## GPU considerations
 
-```bash
-python all_models_summary/absformer/cnn_dm.py
-python all_models_summary/knowledge_aware/wikisum.py
-# ...etc.
-```
-## System requirements 
+Script defaults use BF16 and assume compatible GPU hardware, with configurations suitable for an A100-class machine. Lower-memory GPUs may require reduced source lengths, smaller models or different precision settings. Model loading, dataset preparation and evaluation can be resource-intensive.
 
-**Hardware:** defaults are tuned for **Colab A100** (bf16).Preferably with high GPU for smoother run.
+## Results and scope
 
----
+These files define experimental methods. A script's existence or `scores.json` output path does **not** mean full-dataset fine-tuning and evaluation were completed. Report only performance results attributable to specific completed runs.
 
-## Outputs
-
-Each script writes an `*_outputs/` folder under its model subdir and saves a `scores.json` with ROUGE-1/2/L and BERTScore F1.
-
----
-
-## Pipeline
-
-Load dataset, split into sentences.
-
-Build graphs/hierarchies/knowledge inputs.
-
-Tokenize and prepare structures.
-
-Load model with custom layers.
-
-Fine-tune.
-
-Generate summaries.
-
-Evaluate with ROUGE & BERTScore.
-
----
-
-## Hyperparameters
-
-LR: 1e-5 to 3e-5
-
-Batch: 1, grad acc: 12–32
-
-Epochs: 2–4
-
-Max source: 1024–2048 (cap sentences/nodes)
-
-Max target: 128–200
-
-Beams: 4, length penalty: 1–2
-
-FP16/BF16,
-
-```
-
-## Issues faced
-
-Across all ten models, the main challenges were hardware limits (GPU out-of-memory on large models and long inputs), slow generation times, 
-
-Dataset-specific problems like inconsistent formatting and overly long documents requiring truncation. 
-
-Some architectures (graph-based, hierarchical, multi-agent) added preprocessing complexity and increased memory use. 
-
-Training stability issues also appeared, especially with high learning rates or unoptimized hyperparameters
- 
-While evaluation with ROUGE/BERTScore on large datasets was time-consuming.
-   
-                                                              #######
-
+The proxy methods can serve as baselines or starting points for studying advanced architectures, but should not be presented as implementations of AbsFormer, TG-MultiSum, hierarchical-attention transformers or DCA.
