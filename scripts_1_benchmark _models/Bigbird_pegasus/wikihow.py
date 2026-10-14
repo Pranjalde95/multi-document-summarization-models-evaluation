@@ -3,7 +3,7 @@
 # and write `scores.json` with ROUGE-1/2/L and BERTScore F1 on success.
 # Colab/A100-friendly defaults (bf16, small per-device batch + grad accumulation).
 
-from transformers import (BigBirdPegasusForConditionalGeneration, BigBirdPegasusTokenizerFast,
+from transformers import (BigBirdPegasusForConditionalGeneration, AutoTokenizer,
                           DataCollatorForSeq2Seq, Seq2SeqTrainer, Seq2SeqTrainingArguments)
 import os, json, numpy as np, torch, random
 from datasets import load_dataset, DatasetDict
@@ -30,7 +30,7 @@ raw = load_dataset('sentence-transformers/wikihow')
 def to_map(ex): return {'source': ex['text'], 'target': ex['headline']}
 data = raw.map(to_map, remove_columns=raw['train'].column_names)
 
-tok = BigBirdPegasusTokenizerFast.from_pretrained(MODEL_NAME)
+tok = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 def tokenize(batch):
     X = tok(batch['source'], max_length=MAX_SOURCE_LEN, truncation=True)
